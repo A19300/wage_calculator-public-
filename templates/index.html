@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <title>Pagos de los trabajadores</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .worker-card {
+            border: 2px solid #ccc;
+            margin: 5px;
+            padding: 5px;
+            border-radius: 20px;
+            border-width: 5px;
+        }
+        .hours-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .day-column {
+            text-align: center;
+        }
+        .totals {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            font-weight: bold;
+        }
+
+
+        .workers-table{
+            width: 50%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font: 16px;
+        }
+        
+        .workers-table th,
+        .workers-table td {
+        padding: 12px;
+        text-align: left;
+        border: 1px solid #ddd;
+        }
+
+
+        .workers-table th {
+        background-color: #f5f5f5;
+        font-weight: bold;
+        border-bottom: 2px solid #ddd;
+        }
+
+                /* Align numerical values to the right */
+        .workers-table td:nth-child(2),
+        .workers-table td:nth-child(3),
+        .workers-table td:nth-child(4) {
+            text-align: right;
+        }
+
+        /* Add some spacing between the table and other elements */
+        h1 {
+            margin-bottom: 20px;
+        }
+
+
+        /* Action buttons */
+        .action-buttons {
+        display: flex;
+        gap: 2rem;
+        align-items: flex-start;
+        margin-top: 1rem;
+        }
+
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .button-group h2 {
+            margin-bottom: 0.5rem;
+        }
+
+        .download-button {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+        }
+
+        .reset-button {
+            background-color: #f34444;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .reset-button:hover {
+            background-color: #ffa2a2;
+        }
+
+        .remove{
+            background-color: #f34444;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .reset-button:hover{
+            background-color: #ffa2a2;
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Trabajadores</h1>
+    <table class="workers-table">
+        <thead>
+            <tr>
+                <th> Nombre</th>
+                <th>Salario por Hora</th>
+                <th>Sabado</th>
+                <th>Domingo</th>
+                <th>Lunes</th>
+                <th>Martes</th>
+                <th>Miercoles</th>
+                <th>Jueves</th>
+                <th>Viernes</th>
+                <th>Horas</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for worker in workers %}
+                <tr data-name="{{worker.name}}">
+                    <td>{{worker.name}}</td>
+                    <td>${{worker.wage}}</td>
+                    <td><span class="day-hours saturday">0</span></td>
+                    <td><span class="day-hours sunday">0</span></td>
+                    <td><span class="day-hours monday">0</span></td>
+                    <td><span class="day-hours tuesday">0</span></td>
+                    <td><span class="day-hours wednesday">0</span></td>
+                    <td><span class="day-hours thursday">0</span></td>
+                    <td><span class="day-hours friday">0</span></td>
+                    <td><span class="total-hours">0</span></td>
+                    <td>$<span class="total-pay">0.00</span></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+    <h2> Agregar Trabajador</h2>
+    <form action="/add_worker" method= "POST">
+        <label>Nombre: </label>
+        <input
+            type="text"
+            name="name"
+            required
+        >
+        <label>Salario: </label>
+        <input
+        type="number"
+        name="wage"
+        step="0.01"
+        required
+        >
+
+        <button type='submit'> Agregar </button>
+    </form>
+
+    <h2>Eliminar</h2>
+    <form action="/remove_worker" method="POST">
+        <label>Nombre: </label>
+        <select name="name" required>
+            <!-- We will populate this dynamically from flask-->
+             {% for worker in workers %}
+                <option value="{{worker.name}}">{{worker.name}}</option>
+             {% endfor %}
+        </select>
+        <button type="submit" class="remove">Eliminar</button>
+
+    </form>
+
+    <div class="action-buttons">
+        <div class="button-group">
+            <h2> Imprimir </h2>
+
+            <button onclick="printWorkersTable()" class="print-button">
+                Imprimir
+            </button>
+        </div>
+
+        <div class="button-group">
+            <h2>Guardar Documento</h2>
+            <button onclick="downloadWorkersTable()" class="download_table">
+                Guardar
+            </button>
+        </div>
+    </div>
+
+        <h2> Reanudar </h2>
+        <!-- Add Reset Button -->
+        <button onclick="resetAllHours()" class="reset-button">
+            Reiniciar Horas
+        </button>
+    
+
+    <h1>Pagos de los trabajadores</h1>
+
+    
+    <!-- id stands for identifier to the div(can be styled by css or manipulated with JavaScript),
+        clicking on the button calls Javascript which locates the div using the id-->
+    <div id="workers-container">
+
+        <!-- this is a set of instructions that html has to do-->
+        {% for worker in workers %}
+
+        <!-- for each worker it creates a card. The data-wage attribute is like a sticky note 
+         attached to the card that remembers the worker's wage rate. The double curly braces 
+         are saying "insert the actual worker's information here." -->
+        <div class="worker-card" data-wage="{{ worker.wage }}">
+            <h2>{{ worker.name}} - ${{worker.wage}}</h2>
+
+            <div class="hours-grid">
+                <div class="day-column">
+                    <label>Sabado</label>
+
+                    <!-- type="number" means it only accepts numbers
+                        step="0.01" lets you enter partial hours (like 7.5 hours)
+                        min="0" prevents negative hours
+                        onchange="calculateWorkerTotals(this)" is like a trigger - whenever someone changes the number, it runs the calculation function -->
+                    <input type="number" 
+                           class="hours-input" 
+                           data-day="saturday"
+                           step="0.01" 
+                           min="0"
+                           onchange="calculateWorkerTotals(this)">
+                </div>
+                <div class="day-column">
+                    <label>Domingo</label>
+                    <input type="number" 
+                           class="hours-input" 
+                           data-day="sunday"
+                           step="0.01" 
+                           min="0"
+                           onchange="calculateWorkerTotals(this)">
+                </div>
+                <div class="day-column">
+                    <label>Lunes</label>
+                    <input type="number" 
+                           class="hours-input" 
+                           data-day="monday"
+                           step="0.01" 
+                           min="0"
+                           onchange="calculateWorkerTotals(this)">
+                </div>
+                <div class="day-column">
+                    <label>Martes</label>
+                    <input type="number" 
+                           class="hours-input" 
+                           data-day="tuesday"
+                           step="0.01" 
+                           min="0"
+                           onchange="calculateWorkerTotals(this)">
+                </div>
+                <div class="day-column">
+                    <label>Miercoles</label>
+                    <input type="number" 
+                           class="hours-input" 
+                           data-day="wednesday"
+                           step="0.01" 
+                           min="0"
+                           onchange="calculateWorkerTotals(this)">
+                </div>
+                <div class="day-column">
+                    <label>Jueves</label>
+                    <input type="number" 
+                           class="hours-input" 
+                           data-day="thursday"
+                           step="0.01" 
+                           min="0"
+                           onchange="calculateWorkerTotals(this)">
+                </div>
+                <div class="day-column">
+                    <label>Viernes</label>
+                    <input type="number" 
+                           class="hours-input" 
+                           data-day="friday"
+                           step="0.01" 
+                           min="0"
+                           onchange="calculateWorkerTotals(this)">
+                </div>
+            </div>
+
+
+            
+            <div class="totals">
+                
+                <!-- This creates text that looks like "Total Pay: $0.00" on the page. 
+                The <span> element is like a special container that holds just the number part, 
+                making it easy to update later. -->
+                <p>Total Hours: <span class="total-hours">0</span></p>
+                <p>Total Pay: $<span class="total-pay">0.00</span></p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        // Load saved data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSavedData();
+        });
+
+        // Save worker hours data to localStorage
+        function saveWorkerData() {
+            const workersData = {};
+            document.querySelectorAll('.worker-card').forEach(card => {
+                const workerName = card.querySelector('h2').textContent.split('-')[0].trim();
+                const hoursInputs = {};
+                card.querySelectorAll('.hours-input').forEach(input => {
+                    hoursInputs[input.dataset.day] = input.value || '0';
+                });
+                workersData[workerName] = hoursInputs;
+            });
+            localStorage.setItem('workersData', JSON.stringify(workersData));
+        }
+
+        // Load saved data from localStorage
+        function loadSavedData() {
+            const savedData = localStorage.getItem('workersData');
+            if (savedData) {
+                const workersData = JSON.parse(savedData);
+                Object.keys(workersData).forEach(workerName => {
+                    const card = Array.from(document.querySelectorAll('.worker-card'))
+                        .find(card => card.querySelector('h2').textContent.includes(workerName));
+                    
+                    if (card) {
+                        const hours = workersData[workerName];
+                        Object.keys(hours).forEach(day => {
+                            const input = card.querySelector(`.hours-input[data-day="${day}"]`);
+                            if (input) {
+                                input.value = hours[day];
+                                calculateWorkerTotals(input);
+                            }
+                        });
+                    }
+                });
+            }
+        }
+
+        // Modified calculateWorkerTotals function
+        function calculateWorkerTotals(input) {
+            const workerCard = input.closest('.worker-card');
+            const wage = parseFloat(workerCard.dataset.wage);
+            const workerName = workerCard.querySelector('h2').textContent.split('-')[0].trim();
+
+            const inputs = workerCard.querySelectorAll('.hours-input');
+            let totalHours = 0;
+            const tableRow = document.querySelector(`tr[data-name="${workerName}"]`);
+
+            inputs.forEach(input => {
+                const hours = parseFloat(input.value || 0);
+                totalHours += hours;
+
+                if (tableRow) {
+                    const day = input.dataset.day;
+                    const dayCell = tableRow.querySelector(`td:nth-child(${getDayIndex(day)}) span`);
+                    if (dayCell) {
+                        dayCell.textContent = hours.toFixed(2);
+                    }
+                }
+            });
+            
+            const totalPay = totalHours * wage;
+            
+            workerCard.querySelector('.total-hours').textContent = totalHours.toFixed(2);
+            workerCard.querySelector('.total-pay').textContent = totalPay.toFixed(2);
+
+            if (tableRow) {
+                tableRow.querySelector('.total-hours').textContent = totalHours.toFixed(2);
+                tableRow.querySelector('.total-pay').textContent = totalPay.toFixed(2);
+            }
+
+            // Save data after each calculation
+            saveWorkerData();
+        }
+
+        // Add confirmation to the remove worker form
+        document.querySelector('form[action="/remove_worker"]').onsubmit = function(e) {
+            const workerName = this.querySelector('select[name="name"]').value;
+            if (!confirm(`¿Está seguro que desea eliminar a ${workerName}?`)) {
+                e.preventDefault();
+                return false;
+            }
+            // If confirmed, clear this worker's data from localStorage
+            const savedData = JSON.parse(localStorage.getItem('workersData') || '{}');
+            delete savedData[workerName];
+            localStorage.setItem('workersData', JSON.stringify(savedData));
+            return true;
+        };
+
+        // Previous functions remain the same
+        function getDayIndex(day) {
+            const days = {
+                'saturday': 3,
+                'sunday': 4,
+                'monday': 5,
+                'tuesday': 6,
+                'wednesday': 7,
+                'thursday': 8,
+                'friday': 9
+            };
+            return days[day] || 3;
+        }
+        function printWorkersTable(){
+            // first, we need to create a new window that will contain our printable content
+            const printWindow = window.open('','_blank');
+
+            // get the original table element
+            const originalTable = document.querySelector('.workers-table');
+            
+
+                        // Create the HTML content for our print window
+            const printContent = `
+                <html>
+                <head>
+                    <title>Workers Report</title>
+                    <style>
+                        /* Adding some basic styles for the printed version */
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin: 20px 0;
+                        }
+                        th, td {
+                            border: 1px solid black;
+                            padding: 8px;
+                            text-align: left;
+                        }
+                        th {
+                            background-color: #f2f2f2;
+                        }
+                        h1 {
+                            text-align: center;
+                        }
+                        @media print {
+                            /* Ensure table headers print on every page */
+                            thead {
+                                display: table-header-group;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>Trabajadores</h1>
+                    ${originalTable.outerHTML}
+                </body>
+                </html>
+            `;
+
+            // Write the content to the new window
+            printWindow.document.write(printContent);
+            
+            // Wait for content to load, then print
+            printWindow.document.addEventListener('DOMContentLoaded', () => {
+                printWindow.print();
+                // Close the window after printing (optional)
+                printWindow.close();
+            });
+            
+            // Close the document writing
+            printWindow.document.close();
+        
+
+            
+
+
+    }
+    function downloadWorkersTable() {
+    // Create new jsPDF instance
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Get the table element
+    const table = document.querySelector('.workers-table');
+    
+    // Set up the document
+    doc.setFont("helvetica");
+    doc.setFontSize(20);
+    doc.text("Trabajadores", doc.internal.pageSize.getWidth()/2, 20, {align: 'center'});
+    
+    // Extract table data
+    const data = [];
+    const headers = [];
+    
+    // Get headers
+    table.querySelectorAll('th').forEach(header => {
+        headers.push(header.textContent);
+    });
+    
+    // Get rows
+    table.querySelectorAll('tbody tr').forEach(row => {
+        const rowData = [];
+        row.querySelectorAll('td').forEach(cell => {
+            rowData.push(cell.textContent);
+        });
+        data.push(rowData);
+    });
+    
+    // Add table to PDF
+    doc.setFontSize(12);
+    doc.autoTable({
+        head: [headers],
+        body: data,
+        startY: 30,
+        margin: {top: 15},
+        styles: {
+            fontSize: 8,
+            cellPadding: 2,
+            overflow: 'linebreak'
+        },
+        headStyles: {
+            fillColor: [200, 200, 200],
+            textColor: [0, 0, 0],
+            fontStyle: 'bold'
+        }
+    });
+    
+    // Get current date for filename
+    const date = new Date();
+    const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    
+    // Save the PDF
+    doc.save(`trabajadores-${formattedDate}.pdf`);
+}
+      // New function to reset all hours
+      function resetAllHours() {
+            if (confirm('¿Está seguro que desea reiniciar todas las horas? Esta acción no se puede deshacer.')) {
+                // Reset all input values to 0
+                document.querySelectorAll('.hours-input').forEach(input => {
+                    input.value = '';
+                    calculateWorkerTotals(input);
+                });
+                
+                // Clear the stored hours data but keep worker info
+                const workersData = {};
+                document.querySelectorAll('.worker-card').forEach(card => {
+                    const workerName = card.querySelector('h2').textContent.split('-')[0].trim();
+                    workersData[workerName] = {
+                        'saturday': '',
+                        'sunday': '',
+                        'monday': '',
+                        'tuesday': '',
+                        'wednesday': '',
+                        'thursday': '',
+                        'friday': ''
+                    };
+                });
+                
+                // Save the reset data to localStorage
+                localStorage.setItem('workersData', JSON.stringify(workersData));
+                
+                // Update the table
+                document.querySelectorAll('.workers-table tr[data-name]').forEach(row => {
+                    row.querySelectorAll('.day-hours').forEach(cell => {
+                        cell.textContent = '0.00';
+                    });
+                    row.querySelector('.total-hours').textContent = '0.00';
+                    row.querySelector('.total-pay').textContent = '0.00';
+                });
+            }
+        }
+
+    </script>
+</body>
+</html>
